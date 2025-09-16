@@ -3,7 +3,7 @@
 
 const createDemoUser = async () => {
   try {
-    const response = await fetch('http://localhost:5000/auth/signup', {
+    const response = await fetch('http://localhost:5002/auth/signup', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -28,7 +28,7 @@ const createDemoUser = async () => {
     }
   } catch (error) {
     console.log('❌ Network error:', error.message);
-    console.log('Make sure backend is running on http://localhost:5000');
+    console.log('Make sure backend is running on http://localhost:5002');
   }
 };
 

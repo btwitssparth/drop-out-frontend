@@ -3,6 +3,7 @@ import { LoginScreen } from '../../components/auth/LoginScreen'
 import { ForgotPassword } from '../../components/auth/ForgotPassword'
 import { ResetPassword } from '../../components/auth/ResetPassword'
 import { Dashboard } from '../../components/Dashboard'
+import { CounselorDashboard } from '../../components/CounselorDashboard'
 import { AuthScreen } from '../../components/auth/types'
 
 export default function AuthIndex() {
@@ -42,6 +43,13 @@ export default function AuthIndex() {
           <Dashboard 
             onNavigate={handleNavigate}
             onLogout={() => setCurrentScreen('signin')}
+          />
+        )
+      case 'counselor-dashboard':
+        return (
+          <CounselorDashboard 
+            onNavigate={handleNavigate}
+            onBack={() => setCurrentScreen('signin')}
           />
         )
       default:

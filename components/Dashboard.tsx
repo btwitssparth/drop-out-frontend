@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Dimensions, RefreshControl } from 'react-native'
 import { Card, CardContent, CardHeader } from './ui/card'
-import { GraduationCap, TrendingUp, TrendingDown, LogOut, RefreshCw } from 'lucide-react-native'
+import { GraduationCap, TrendingUp, TrendingDown, LogOut, RefreshCw, MessageCircle } from 'lucide-react-native'
 import { StatusBar } from 'expo-status-bar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { PieChart, LineChart } from 'react-native-chart-kit'
 import authService from '../services/authService'
+import { Chatbot } from './Chatbot'
 
 const screenWidth = Dimensions.get('window').width
 
@@ -34,6 +35,13 @@ interface DashboardData {
     attendance: number
     riskScore: number
   }>
+  student?: {
+    userId: string
+    name: string
+    course: string
+    year: number
+  }
+  rawDashboard?: Array<any>
 }
 
 export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
@@ -43,7 +51,8 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const insets = useSafeAreaInsets()
 
-  // Mock data for demo
+  const [isUsingMockData, setIsUsingMockData] = useState(false)
+  const [isChatbotVisible, setIsChatbotVisible] = useState(false)
   const mockDashboardData: DashboardData = {
     avgGpa: 3.42,
     avgAttendance: 87,
@@ -94,6 +103,7 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
+      setIsUsingMockData(false)
       
       // Get user data
       const user = await authService.getStoredUserData()
@@ -102,16 +112,28 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
       // Try to fetch dashboard data from API
       try {
         const data = await authService.getDashboardData()
+        console.log(data)
         setDashboardData(data)
+        console.log('✅ Successfully loaded real data from backend')
       } catch (apiError) {
         // Fallback to mock data
-        console.log('API failed, using mock data:', apiError)
+        console.log('⚠️ API failed, using mock data:', apiError)
         setDashboardData(mockDashboardData)
+        setIsUsingMockData(true)
+        Alert.alert(
+          'Using Demo Data', 
+          'Could not connect to backend. Showing demo data instead.\n\nMake sure backend is running on port 5002.',
+          [{ text: 'OK' }]
+        )
       }
     } catch (error) {
       console.error('Error loading dashboard:', error)
-      Alert.alert('Error', 'Failed to load dashboard data')
-      setDashboardData(mockDashboardData) // Fallback to mock data
+      setDashboardData(mockDashboardData)
+      setIsUsingMockData(true)
+      Alert.alert(
+        'Error', 
+        'Failed to load dashboard data. Showing demo data instead.'
+      )
     } finally {
       setLoading(false)
     }
@@ -171,10 +193,26 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
               <GraduationCap size={24} color="white" />
             </View>
             <View>
-              <Text className="text-xl font-semibold text-gray-900">Dashboard</Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-xl font-semibold text-gray-900">Dashboard</Text>
+                {isUsingMockData ? (
+                  <View className="bg-orange-100 px-2 py-1 rounded">
+                    <Text className="text-xs text-orange-600 font-medium">DEMO</Text>
+                  </View>
+                ) : (
+                  <View className="bg-green-100 px-2 py-1 rounded">
+                    <Text className="text-xs text-green-600 font-medium">LIVE</Text>
+                  </View>
+                )}
+              </View>
               <Text className="text-sm text-gray-600">
-                Welcome, {userData?.name || 'Student'}
+                Welcome, {dashboardData?.student?.name || userData?.name || 'Student'}
               </Text>
+              {dashboardData?.student?.course && (
+                <Text className="text-xs text-gray-500">
+                  {dashboardData.student.course} - Year {dashboardData.student.year}
+                </Text>
+              )}
             </View>
           </View>
           
@@ -323,6 +361,84 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
           </CardContent>
         </Card>
 
+        {/* Semester-wise Details */}
+        {dashboardData?.rawDashboard && dashboardData.rawDashboard.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="pb-4">
+              <Text className="text-lg font-semibold text-gray-900">Semester Details</Text>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View className="flex-row gap-4">
+                  {dashboardData.rawDashboard.map((record: any, index: number) => {
+                    const riskColor = record.riskStatus === 'Safe' ? 'text-green-600' :
+                                     record.riskStatus === 'Warning' ? 'text-yellow-600' : 'text-red-600';
+                    const riskBgColor = record.riskStatus === 'Safe' ? 'bg-green-50' :
+                                       record.riskStatus === 'Warning' ? 'bg-yellow-50' : 'bg-red-50';
+                    
+                    return (
+                      <View key={index} className={`min-w-[200px] p-4 rounded-lg ${riskBgColor} mr-2`}>
+                        <Text className="text-lg font-bold text-gray-900 mb-2">
+                          Semester {record.semester}
+                        </Text>
+                        <View className="space-y-2">
+                          <View className="flex-row justify-between">
+                            <Text className="text-sm text-gray-600">GPA:</Text>
+                            <Text className="text-sm font-medium">{record.gpa || 'N/A'}</Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-sm text-gray-600">CGPA:</Text>
+                            <Text className="text-sm font-medium">{record.cgpa || 'N/A'}</Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-sm text-gray-600">Attendance:</Text>
+                            <Text className="text-sm font-medium">
+                              {record.attendancePercentage ? `${record.attendancePercentage}%` : 'N/A'}
+                            </Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-sm text-gray-600">Backlogs:</Text>
+                            <Text className="text-sm font-medium">{record.backlogs || 0}</Text>
+                          </View>
+                          <View className="flex-row justify-between">
+                            <Text className="text-sm text-gray-600">Risk:</Text>
+                            <Text className={`text-sm font-medium ${riskColor}`}>
+                              {record.riskStatus || 'Unknown'}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Counselling Assistant Info */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1">
+                <View className="flex-row items-center gap-2 mb-2">
+                  <MessageCircle size={20} color="#2563EB" />
+                  <Text className="text-lg font-semibold text-gray-900">Need Support?</Text>
+                </View>
+                <Text className="text-sm text-gray-600 mb-3">
+                  Chat with our AI counselling assistant for academic guidance, stress management, and emotional support.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsChatbotVisible(true)}
+                className="bg-blue-600 px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white font-medium text-sm">Chat Now</Text>
+              </TouchableOpacity>
+            </View>
+          </CardContent>
+        </Card>
+
         {/* Performance Summary */}
         <Card>
           <CardHeader className="pb-4">
@@ -331,20 +447,31 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
           <CardContent className="p-4 pt-0">
             <View className="space-y-3">
               <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
-                <Text className="text-sm text-gray-600">Risk Level</Text>
-                <Text className="text-sm font-medium text-green-600">Low Risk</Text>
+                <Text className="text-sm text-gray-600">Overall Risk Level</Text>
+                <Text className={`text-sm font-medium ${
+                  (dashboardData?.rawDashboard?.[dashboardData.rawDashboard.length - 1]?.riskStatus === 'Safe') ? 'text-green-600' :
+                  (dashboardData?.rawDashboard?.[dashboardData.rawDashboard.length - 1]?.riskStatus === 'Warning') ? 'text-yellow-600' : 'text-red-600'
+                }`}>
+                  {dashboardData?.rawDashboard?.[dashboardData.rawDashboard.length - 1]?.riskStatus || 'Unknown'}
+                </Text>
               </View>
               <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
-                <Text className="text-sm text-gray-600">Current GPA</Text>
-                <Text className="text-sm font-medium">{dashboardData?.avgGpa || '3.42'}</Text>
+                <Text className="text-sm text-gray-600">Average GPA</Text>
+                <Text className="text-sm font-medium">{dashboardData?.avgGpa || 'N/A'}</Text>
               </View>
               <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
-                <Text className="text-sm text-gray-600">Attendance Rate</Text>
-                <Text className="text-sm font-medium">{dashboardData?.avgAttendance || 87}%</Text>
+                <Text className="text-sm text-gray-600">Average Attendance</Text>
+                <Text className="text-sm font-medium">{dashboardData?.avgAttendance || 'N/A'}%</Text>
+              </View>
+              <View className="flex-row items-center justify-between py-2 border-b border-gray-100">
+                <Text className="text-sm text-gray-600">Total Semesters</Text>
+                <Text className="text-sm font-medium">{dashboardData?.rawDashboard?.length || 0}</Text>
               </View>
               <View className="flex-row items-center justify-between py-2">
-                <Text className="text-sm text-gray-600">Prediction Accuracy</Text>
-                <Text className="text-sm font-medium text-blue-600">94.2%</Text>
+                <Text className="text-sm text-gray-600">Student ID</Text>
+                <Text className="text-sm font-medium text-blue-600">
+                  {dashboardData?.student?.userId || userData?.userId || 'N/A'}
+                </Text>
               </View>
             </View>
           </CardContent>
@@ -356,6 +483,12 @@ export function Dashboard({ onNavigate, onLogout }: DashboardProps) {
         <Text className="text-gray-500 text-xs">© 2025 Dropout Prediction System</Text>
         <Text className="text-gray-500 text-xs">Version 1.0.2</Text>
       </View>
+
+      {/* Chatbot */}
+      <Chatbot 
+        isVisible={isChatbotVisible} 
+        onToggle={() => setIsChatbotVisible(!isChatbotVisible)} 
+      />
     </View>
   )
 }

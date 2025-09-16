@@ -49,8 +49,12 @@ export function LoginScreen({ onNavigate }: AuthNavigationProps) {
           {
             text: 'OK',
             onPress: () => {
-              // Navigate to dashboard
-              onNavigate('dashboard')
+              // Navigate to dashboard based on user role
+              if (response.user.role === 'counselor') {
+                onNavigate('counselor-dashboard')
+              } else {
+                onNavigate('dashboard')
+              }
             }
           }
         ]
